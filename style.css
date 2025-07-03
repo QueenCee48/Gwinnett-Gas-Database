@@ -1,0 +1,19 @@
+h1 a {
+    text-decoration: none;
+}
+
+.tableHeader {
+    font-size: large;
+}
+
+th a {
+    font-size: smaller;
+}
+
+h1 a:hover {
+    color: black;
+}
+
+#signature {
+    font-size: smaller;
+}
