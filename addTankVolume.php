@@ -11,8 +11,9 @@
         }
     }
 
-    $date = $station = $regStart = $regEnd = $midStart = $midEnd = $premStart = $premEnd = "";
-    $date_err = $station_err = $regStart_err = $regEnd_err = $midStart_err = $midEnd_err = $premStart_err = $premEnd_err = "";
+    $date = $station = $regEnd = $midEnd = $premEnd = "";
+    $date_err = $station_err = $regEnd_err = $midEnd_err = $premEnd_err = "";
+
     $success_msg = "";
 
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -39,18 +40,6 @@
             $station = htmlspecialchars($_POST['station']);
         }
 
-        if (empty(trim($_POST['regularS']))) {
-            $regStart_err = "Please enter gallons.";
-            $hasError = true;
-        }
-        elseif (!preg_match("/^\d{1,11}?$/", $_POST['regularS'])) {
-            $regStart_err = "Must be a valid number.";
-            $hasError = true;
-        }
-        else {
-            $regStart = htmlspecialchars($_POST['regularS']);
-        }
-
         if (empty(trim($_POST['regularE']))) {
             $regEnd_err = "Please enter gallons.";
             $hasError = true;
@@ -63,18 +52,6 @@
             $regEnd = htmlspecialchars($_POST['regularE']);
         }
 
-        if (empty(trim($_POST['midgradeS']))) {
-            $midStart_err = "Please enter gallons.";
-            $hasError = true;
-        }
-        elseif (!preg_match("/^\d{1,11}?$/", $_POST['midgradeS'])) {
-            $midStart_err = "Must be a valid number.";
-            $hasError = true;
-        }
-        else {
-            $midStart = htmlspecialchars($_POST['midgradeS']);
-        }
-
         if (empty(trim($_POST['midgradeE']))) {
             $midEnd_err = "Please enter gallons.";
             $hasError = true;
@@ -85,18 +62,6 @@
         }
         else {
             $midEnd = htmlspecialchars($_POST['midgradeE']);
-        }
-
-        if (empty(trim($_POST['premiumS']))) {
-            $premStart_err = "Please enter gallons.";
-            $hasError = true;
-        }
-        elseif (!preg_match("/^\d{1,11}?$/", $_POST['premiumS'])) {
-            $premStart_err = "Must be a valid number.";
-            $hasError = true;
-        }
-        else {
-            $premStart = htmlspecialchars($_POST['premiumS']);
         }
 
         if (empty(trim($_POST['premiumE']))) {
@@ -113,42 +78,73 @@
 
         if (!$hasError) {
 
-                // User submitted and all fields are set
-                include "connectDatabase.php";
+            // User submitted and all fields are set
+            include "connectDatabase.php";
 
-                // Create short variable names
-                $date = mysqli_real_escape_string($conn, $date);
-                $stationid = mysqli_real_escape_string($conn, $station);
-                $regularStart = mysqli_real_escape_string($conn, $regStart);
-                $regularEnd = mysqli_real_escape_string($conn, $regEnd);
-                $midgradeStart = mysqli_real_escape_string($conn, $midStart);
-                $midgradeEnd = mysqli_real_escape_string($conn, $midEnd);
-                $premiumStart = mysqli_real_escape_string($conn, $premStart);
-                $premiumEnd = mysqli_real_escape_string($conn, $premEnd);
+            // Create short variable names
+            $date = mysqli_real_escape_string($conn, $date);
+            $stationid = mysqli_real_escape_string($conn, $station);
+            $regularEnd = mysqli_real_escape_string($conn, $regEnd);
+            $midgradeEnd = mysqli_real_escape_string($conn, $midEnd);
+            $premiumEnd = mysqli_real_escape_string($conn, $premEnd);
 
-                $sql = "INSERT INTO tankvolumereport (Date, StationID, Reg_Start, Reg_End, Mid_Start, Mid_End, Prem_Start, Prem_End) 
-                    VALUES ('$date', '$stationid', '$regularStart', '$regularEnd', '$midgradeStart', '$midgradeEnd', '$premiumStart', '$premiumEnd') ";
+            $regularStart = $midgradeStart = $premiumStart = 0;
 
-                if ($conn->query($sql) === TRUE) {
-                    $success_msg = "
-                    <div class='w3-margin w3-padding w3-pale-blue'>
-                        <strong>New Daily Tank Volume added successfully!</strong><br>
-                        <br>
-                        Date: $date<br>
-                        Station ID: $stationid<br>
-                        Starting Regular: $regularStart gal<br>
-                        Ending Regular: $regularEnd gal<br>
-                        Starting MidGrade: $midgradeStart gal<br>
-                        Ending MidGrade: $midgradeEnd gal<br>
-                        Starting Premium: $premiumStart gal<br>
-                        Ending Premium: $premiumEnd gal<br>
-                    </div>";
+            $prevDateQuery = "SELECT DATE_SUB('$date', INTERVAL 1 DAY) AS PrevDate";
+            $prevDateResult = $conn->query($prevDateQuery);
 
-                    $date = $station = $regStart = $regEnd = $midStart = $midEnd = $premStart = $premEnd = "";
+            if ($prevDateResult && $prevDateRow = $prevDateResult->fetch_assoc()) {
+                $prevDate = $prevDateRow['PrevDate'];
+
+                $sql1  = "SELECT Reg_End, Mid_End, Prem_End ";
+                $sql1 .= "FROM tankvolumereport ";
+                $sql1 .= "WHERE Date = '$prevDate' AND StationID = '$stationid' ";
+                $sql1 .= "LIMIT 1 ";
+
+                $result1 = $conn->query($sql1);
+
+                if ($result1 && $result1->num_rows > 0) {
+                    $row = $result1->fetch_assoc();
+
+                    $regularStart = $row['Reg_End'];
+                    $midgradeStart = $row['Mid_End'];
+                    $premiumStart = $row['Prem_End'];
+
+                    $sql = "INSERT INTO tankvolumereport (Date, StationID, Reg_Start, Reg_End, Mid_Start, Mid_End, Prem_Start, Prem_End) 
+                        VALUES ('$date', '$stationid', '$regularStart', '$regularEnd', '$midgradeStart', '$midgradeEnd', '$premiumStart', '$premiumEnd') ";
+
+                    if ($conn->query($sql) === TRUE) {
+                        $success_msg = "
+                        <div class='w3-margin w3-padding w3-pale-blue'>
+                            <strong>New Daily Tank Volume added successfully!</strong><br>
+                            <br>
+                            Date: $date<br>
+                            Station ID: $stationid<br>
+                            Starting Regular: $regularStart gal<br>
+                            Ending Regular: $regularEnd gal<br>
+                            Starting MidGrade: $midgradeStart gal<br>
+                            Ending MidGrade: $midgradeEnd gal<br>
+                            Starting Premium: $premiumStart gal<br>
+                            Ending Premium: $premiumEnd gal<br>
+                        </div>";
+
+                        $date = $station = $regEnd = $midEnd = $premEnd = "";
+                    }
+
+                    $conn->close();
                 }
-
-                $conn->close();
+                else {
+                    $success_msg = "
+                        <div class='w3-margin w3-padding w3-red'>
+                            <strong>No data found for the previous day ($prevDate) for this station. Submission aborted.</strong><br>
+                        </div>
+                    ";
+                    $conn->close();
+                }
             }
+
+            
+        }
     }
 ?>
 
@@ -220,12 +216,6 @@
                 </select>
                 <?php if ($station_err): ?><span class="w3-text-red"><?= $station_err ?></span><?php endif; ?>
                 </div>
-                
-                <div class="w3-margin-bottom">
-                <label>Starting Regular (gal):</label>
-                <input type="text" class="w3-input w3-border <?= $regStart_err ? 'w3-border-red' : '' ?>" value="<?= $regStart ?>" name="regularS">
-                <?php if ($regStart_err): ?><span class="w3-text-red"><?= $regStart_err ?></span><?php endif; ?>
-                </div>
 
                 <div class="w3-margin-bottom">
                 <label>Ending Regular (gal):</label>
@@ -234,21 +224,9 @@
                 </div>
 
                 <div class="w3-margin-bottom">
-                <label>Starting MidGrade (gal):</label>
-                <input type="text" class="w3-input w3-border <?= $midStart_err ? 'w3-border-red' : '' ?>" value="<?= $midStart ?>" name="midgradeS">
-                <?php if ($midStart_err): ?><span class="w3-text-red"><?= $midStart_err ?></span><?php endif; ?>
-                </div>
-
-                <div class="w3-margin-bottom">
                 <label>Ending MidGrade (gal):</label>
                 <input type="text" class="w3-input w3-border <?= $midEnd_err ? 'w3-border-red' : '' ?>" value="<?= $midEnd ?>" name="midgradeE">
                 <?php if ($midEnd_err): ?><span class="w3-text-red"><?= $midEnd_err ?></span><?php endif; ?>
-                </div>
-
-                <div class="w3-margin-bottom">
-                <label>Starting Premium (gal):</label>
-                <input type="text" class="w3-input w3-border <?= $premStart_err ? 'w3-border-red' : '' ?>" value="<?= $premStart ?>" name="premiumS">
-                <?php if ($premStart_err): ?><span class="w3-text-red"><?= $premStart_err ?></span><?php endif; ?>
                 </div>
 
                 <div>
